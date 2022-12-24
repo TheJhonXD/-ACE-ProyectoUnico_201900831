@@ -559,18 +559,24 @@ capTwoNums endp
 
 ;Muestra los dos numeros en memoria
 showTwoNums proc
-
     AAM
     mov bx, ax
+
+    ;Compruebo si el registro bh es 0, si lo es no imprimo su contenido
+    cmp bh, 00
+    je unNumero
+
     mov ah, 02h
     mov dl, bh
     add dl, 30h
     int 21h
 
-    mov ah, 02h
-    mov dl, bl
-    add dl, 30h
-    int 21h
+    ;Imprimo el segundo numero
+    unNumero:
+        mov ah, 02h
+        mov dl, bl
+        add dl, 30h
+        int 21h
 
     ret
 
@@ -888,7 +894,7 @@ derivada proc
         
         ;Muestra el mensaje en pantalla
         mov ah, 09h
-        lea dx, l2  ;muestra la literal x
+        lea dx, l1  ;muestra la literal x
         int 21h
 
         cmp cd1, 00
