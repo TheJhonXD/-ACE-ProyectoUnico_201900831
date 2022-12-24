@@ -1,4 +1,5 @@
-.286                            ; conjunto de instrucciones a usar
+;.286                            ; conjunto de instrucciones a usar
+include macro.asm
 pila segment stack       		;segmento de pila
 	     db 32 DUP('stack--')
 pila ends
@@ -20,7 +21,7 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     message db 13, 10, 'El numero es: $'
     opc2 db 13, 10, 'Funcion almacenada: $'
     opc3 db 13, 10, 'Derivada de la funcion: $'
-    opc4 db 13, 10, 'Opcion 4 $'
+    opc4 db 13, 10, 'Integral de la funcion: $'
     opc5 db 13, 10, 'Opcion 5 $'
     opc6 db 13, 10, 'Opcion 6 $'
     opc7 db 13, 10, 'Opcion 7 $'
@@ -62,15 +63,28 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     cd4 db 00
     cd5 db 00
 
+    ;Coeficientes integrados
+    ci0 db 00
+    ci1 db 00
+    ci2 db 00
+    ci3 db 00
+    ci4 db 00
+    ci5 db 00
+
     ;Literales
     l1 db 'X$'
     l2 db 'X^2$'
     l3 db 'X^3$'
     l4 db 'X^4$'
     l5 db 'X^5$'
+    l6 db 'X^6$'
 
     ;suma
     sig_suma db ' + $'
+    let_C    db 'C$'
+
+    ;ERROR
+    msg_error db 'Entrada no valida$'
 
 datos ends
 
@@ -146,6 +160,8 @@ main proc FAR
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc4  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
+                call integral
+                call pressAnyKey
 
             jmp mostrar_menu
 
@@ -153,21 +169,21 @@ main proc FAR
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc5  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
-
+                call pressAnyKey
             jmp mostrar_menu
 
             opcion6:
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc6  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
-
+                call pressAnyKey
             jmp mostrar_menu
 
             opcion7:
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc7  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
-
+                call pressAnyKey
             jmp mostrar_menu
 
             salir:
@@ -611,6 +627,13 @@ resetCof proc
     mov cd4, 00
     mov cd5, 00
 
+    mov ci0, 00
+    mov ci1, 00
+    mov ci2, 00
+    mov ci3, 00
+    mov ci4, 00
+    mov ci5, 00
+
     ret
 
 resetCof endp
@@ -965,6 +988,210 @@ derivar proc
 
 
 derivar endp
+
+integral proc
+
+    ; llama al procedimiento integrar
+    call integrar
+    
+    cmp ci5,00      ; compara la variable con 0
+    je print_intG4  ; si es igual a 0 salta a print_derG3
+
+    ;Muestra el mensaje en pantalla
+    mov al, ci5
+    call showTwoNums
+    
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l6  ;muestra la literal x^6
+    int 21h
+
+    cmp ci4, 00
+    jne print_intG4aux
+    cmp ci3, 00
+    jne print_intG3aux
+    cmp ci2, 00
+    jne print_intG2aux
+    cmp ci1, 00
+    jne print_intG1aux
+    cmp ci0, 00
+    jne print_intG0aux
+    jmp salir_integral
+    ;-------------------------------------------------------------
+
+
+    print_intG4aux:
+        call mostrar_suma
+        jmp print_intG4
+    print_intG3aux:
+        call mostrar_suma
+        jmp print_intG3
+    print_intG2aux:
+        call mostrar_suma
+        jmp print_intG2
+    print_intG1aux:
+        call mostrar_suma
+        jmp print_intG1
+    print_intG0aux:
+        call mostrar_suma
+        jmp print_intG0
+
+    print_intG4:
+        cmp ci4,00      ; compara la variable con 0
+        je print_intG3  ; si es igual a 0 salta a print_derG2
+
+        ;Muestra el mensaje en pantalla
+        mov al, ci4
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l5  ;muestra la literal x^5
+        int 21h
+
+        cmp ci3, 00
+        jne print_intG3aux
+        cmp ci2, 00
+        jne print_intG2aux
+        cmp ci1, 00
+        jne print_intG1aux
+        cmp ci0, 00
+        jne print_intG0aux
+        jmp salir_integral
+    ;--------------------------------------------------------------
+    print_intG3:
+        cmp ci3,00      ; compara la variable con 0
+        je print_intG2  ; si es igual a 0 salta a print_derG1
+
+        ;Muestra el mensaje en pantalla
+        mov al, ci3
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l4  ;muestra la literal x^2
+        int 21h
+
+        cmp ci2, 00
+        jne print_intG2aux
+        cmp ci1, 00
+        jne print_intG1aux
+        cmp ci0, 00
+        jne print_intG0aux
+        jmp salir_integral
+    ;---------------------------------------------------------------
+    print_intG2:
+        cmp ci2,00      ; compara la variable con 0
+        je print_intG1  ; si es igual a 0 salta a salidoEqL5aux
+
+        ;Muestra el mensaje en pantalla
+        mov al, ci2
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l3  ;muestra la literal x
+        int 21h
+
+        cmp ci1, 00
+        jne print_intG1aux
+        cmp ci0, 00
+        jne print_intG0aux
+        jmp salir_integral
+    ;----------------------------------------------------------------
+    print_intG1:
+        cmp ci1,00      ; compara la variable con 0
+        je print_intG0  ; si es igual a 0 salta a salidoEqL5
+
+        ;Muestra el mensaje en pantalla
+        mov al, ci1
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l2  ;muestra la literal x
+        int 21h
+
+        cmp ci0, 00
+        jne print_intG0aux
+        jmp salir_integral
+
+    print_intG0:
+        cmp ci0,00      ; compara la variable con 0
+        je salir_integral  ; si es igual a 0 salta a salidoEqL5
+
+        ;Muestra el mensaje en pantalla
+        mov al, ci0
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l1  ;muestra la literal x
+        int 21h
+    
+    mov ah, 09h
+    lea dx, sig_suma  ;muestra la literal x
+    int 21h
+
+    mov ah, 09h
+    lea dx, let_C  ;muestra la literal C
+    int 21h
+
+    salir_integral:
+        ret
+
+integral endp
+
+
+;dividirCof proc
+;    xor ax, ax
+;    mov al, c1
+;dividirCof endp
+
+
+integrar proc
+    mov al, c0
+    mov ci0, al
+
+    cmp c1, 00
+    je intG2
+    dividirCof c1, 2, ci1
+    ;mov ci1, al
+    ;mov al, c1
+    ;mov cd1, al
+
+    intG2:
+        cmp c2, 00
+        je intG3
+
+        dividirCof c2, 3, ci2
+        ;mov ci2, al
+    
+    intG3:
+        cmp c3, 00
+        je intG4
+
+        dividirCof c3, 4, ci3
+        ;mov ci3, al
+
+    intG4:
+        cmp c4, 00
+        je intG5
+
+        dividirCof c4, 5, ci4
+        ;mov ci4, al
+
+    intG5:
+        cmp c5, 00
+        je salirIntegrarG1
+
+        dividirCof c5, 6, ci5
+        ;mov ci5, al
+
+    salirIntegrarG1:
+        ret
+
+integrar endp
 
 
 ;Limpia la ventana
