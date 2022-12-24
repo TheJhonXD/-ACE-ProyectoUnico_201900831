@@ -18,8 +18,8 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     salido db 13, 10, 'Presione una tecla para continuar... $'
 
     message db 13, 10, 'El numero es: $'
-    opc2 db 13, 10, 'Opcion 2 $'
-    opc3 db 13, 10, 'Opcion 3 $'
+    opc2 db 13, 10, 'Funcion almacenada: $'
+    opc3 db 13, 10, 'Derivada de la funcion: $'
     opc4 db 13, 10, 'Opcion 4 $'
     opc5 db 13, 10, 'Opcion 5 $'
     opc6 db 13, 10, 'Opcion 6 $'
@@ -46,15 +46,31 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     cof_msg5 db 13, 10, 'Ingrese el coeficiente para el grado 5: $'
 
     ;Coeficientes
-    u  db 0
-    d  db 0
-    c0 db 0
-    c1 db 0
-    c2 db 0
-    c3 db 0
-    c4 db 0
-    c5 db 0
+    u  db 00
+    d  db 00
+    c0 db 00
+    c1 db 00
+    c2 db 00
+    c3 db 00
+    c4 db 00
+    c5 db 00
+    
+    ;Coeficientes derivados
+    cd1 db 00
+    cd2 db 00
+    cd3 db 00
+    cd4 db 00
+    cd5 db 00
 
+    ;Literales
+    l1 db 'X$'
+    l2 db 'X^2$'
+    l3 db 'X^3$'
+    l4 db 'X^4$'
+    l5 db 'X^5$'
+
+    ;suma
+    sig_suma db ' + $'
 
 datos ends
 
@@ -64,7 +80,7 @@ main proc FAR
 
             mov    ax,datos      ; guardo en el registro ax el valor de mi seg de datos
             mov    ds,ax         ; lo muevo a mi datasegment (segmento de datos) para poderlos usar
-
+            
             ;------------ Menú ------------
             mostrar_menu:
                 call limpiar
@@ -113,6 +129,8 @@ main proc FAR
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc2  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
+                call printEqL5
+                call pressAnyKey
 
             jmp mostrar_menu
 
@@ -120,7 +138,8 @@ main proc FAR
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc3  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
-
+                call derivada
+                call pressAnyKey
             jmp mostrar_menu
             
             opcion4:
@@ -159,6 +178,22 @@ main proc FAR
 main endp                       ; fin del procedimiento main
 
 
+pressAnyKey proc
+    ;mostrar mensaje de salido
+    mov ah, 09h
+    lea dx, salido
+    int 21h
+
+    ;------------ Espero que presione ------------
+    mov ah,01h
+    int 21h
+    ;sub al,48d      ; ajusto para que aparezca el numero
+    ;--------------------------------------------- 
+
+    ret
+
+pressAnyKey endp
+
 ;Submenu ecuacion
 menu_ecuacion proc
 
@@ -195,14 +230,19 @@ menu_ecuacion proc
     jmp mostrar_submenu
 
     subaux_opcion1:
+        call resetCof
         jmp sub_opcion1
     subaux_opcion2:
+        call resetCof
         jmp sub_opcion2
     subaux_opcion3:
+        call resetCof
         jmp sub_opcion3
     subaux_opcion4:
+        call resetCof
         jmp sub_opcion4
     subaux_opcion5:
+        call resetCof
         jmp sub_opcion5
     subaux_opcion6:
         jmp salirSubmenu
@@ -496,20 +536,23 @@ menu_ecuacion endp
 capTwoNums proc
 
     ;------------ Pido la opcion ------------
-    ;Primer numero (decena)
-    mov ah,01h
-    int 21h
-    sub al,30h      ; ajusto para que aparezca el numero
-    mov d, al
+    decena:
+        ;Primer numero (decena)
+        mov ah,01h
+        int 21h
+        sub al,30h      ; ajusto para que aparezca el numero
+        mov d, al
 
     ; Segundo numero (unidad)
-    mov ah,01h
-    int 21h
-    sub al,30h      ; ajusto para que aparezca el numero
-    mov u, al
-    ;----------------------------------------
-
-    ret
+    cetena:
+        mov ah,01h
+        int 21h
+        sub al,30h      ; ajusto para que aparezca el numero
+        mov u, al
+        ;----------------------------------------
+    
+    salirCapTwoNums:
+        ret
 
 capTwoNums endp
 
@@ -543,8 +586,379 @@ unirNums proc
     add al, u
 
     ret
-
+    
 unirNums endp
+
+;Pone en cero los coeficientes
+resetCof proc
+
+    mov c0, 00
+    mov c1, 00
+    mov c2, 00
+    mov c3, 00
+    mov c4, 00
+    mov c5, 00
+
+    mov cd1, 00
+    mov cd2, 00
+    mov cd3, 00
+    mov cd4, 00
+    mov cd5, 00
+
+    ret
+
+resetCof endp
+
+;imprime en pantalla una ecuacion de grado 1
+printEqL1 proc
+
+    print_gr1:
+        cmp c1,00      ; compara las opciones que el usuario ingresa 
+        je print_gr0  ; si es igual a 0 salta a print_gr0
+
+        ;Muestra el mensaje en pantalla
+        mov al, c1
+        call showTwoNums
+
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l1  ;muestra la literal x
+        int 21h
+
+        ;Muestra el signo de suma
+        mov ah, 09h
+        lea dx, sig_suma
+        int 21h
+
+    print_gr0:
+        cmp c0,00      ; compara las opciones que el usuario ingresa 
+        je salidoEqL1  ; si no es igual a 0 salta a salidoEqL1
+
+        ;Muestra el mensaje en pantalla
+        mov al, c0
+        call showTwoNums
+
+    salidoEqL1:
+        ret
+
+printEqL1 endp
+
+;imprime en pantalla una ecuacion de grado 2
+printEqL2 proc
+    cmp c2,00      ; compara las opciones que el usuario ingresa 
+    je salidoEqL2  ; si es igual a 0 salta a salidoEqL2
+
+    ;Muestra el mensaje en pantalla
+    mov al, c2
+    call showTwoNums
+
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l2  ;muestra la literal x^2
+    int 21h
+
+    cmp c1, 00
+    jne salidoEqL2aux
+    cmp c0, 00
+    jne salidoEqL2aux
+    jmp salidoEqL2
+
+    salidoEqL2aux:
+        ;Muestra el signo de suma
+        mov ah, 09h
+        lea dx, sig_suma
+        int 21h
+
+    salidoEqL2:
+        call printEqL1
+
+    ret
+
+printEqL2 endp
+
+;imprime en pantalla una ecuacion de grado 3
+printEqL3 proc
+    cmp c3,00      ; compara las opciones que el usuario ingresa 
+    je salidoEqL3  ; si es igual a 0 salta a salidoEqL3
+
+    ;Muestra el mensaje en pantalla
+    mov al, c3
+    call showTwoNums
+
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l3  ;muestra la literal x^3
+    int 21h
+
+    cmp c2, 00
+    jne salidoEqL3aux
+    cmp c1, 00
+    jne salidoEqL3aux
+    cmp c0, 00
+    jne salidoEqL3aux
+    jmp salidoEqL3
+
+    salidoEqL3aux:
+        ;Muestra el signo de suma
+        mov ah, 09h
+        lea dx, sig_suma
+        int 21h
+
+    salidoEqL3:
+        call printEqL2
+
+    ret
+
+printEqL3 endp
+
+;imprime en pantalla una ecuacion de grado 4
+printEqL4 proc
+    cmp c4,00      ; compara las opciones que el usuario ingresa 
+    je salidoEqL4  ; si es igual a 0 salta a salidoEqL4
+
+    ;Muestra el mensaje en pantalla
+    mov al, c4
+    call showTwoNums
+
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l4  ;muestra la literal x^4
+    int 21h
+
+    cmp c3, 00
+    jne salidoEqL4aux
+    cmp c2, 00
+    jne salidoEqL4aux
+    cmp c1, 00
+    jne salidoEqL4aux
+    cmp c0, 00
+    jne salidoEqL4aux
+    jmp salidoEqL4
+
+    salidoEqL4aux:
+        ;Muestra el signo de suma
+        mov ah, 09h
+        lea dx, sig_suma
+        int 21h
+
+    salidoEqL4:
+        call printEqL3
+
+    ret
+
+printEqL4 endp
+
+;imprime en pantalla una ecuacion de grado 5
+printEqL5 proc
+    cmp c5,00      ; compara las opciones que el usuario ingresa 
+    je salidoEqL5  ; si es igual a 0 salta a salidoEqL5
+
+    ;Muestra el mensaje en pantalla
+    mov al, c5
+    call showTwoNums
+
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l5  ;muestra la literal x^5
+    int 21h
+
+    cmp c4, 00
+    jne salidoEqL5aux
+    cmp c3, 00
+    jne salidoEqL5aux
+    cmp c2, 00
+    jne salidoEqL5aux
+    cmp c1, 00
+    jne salidoEqL5aux
+    cmp c0, 00
+    jne salidoEqL5aux
+    jmp salidoEqL5
+
+    salidoEqL5aux:
+        ;Muestra el signo de suma
+        mov ah, 09h
+        lea dx, sig_suma
+        int 21h
+
+    salidoEqL5:
+        call printEqL4
+
+    ret
+
+printEqL5 endp
+
+mostrar_suma proc
+    ;Muestra el signo de suma
+    mov ah, 09h
+    lea dx, sig_suma
+    int 21h
+    ret
+mostrar_suma endp
+
+
+derivada proc
+
+    ; llama al procedimiento derivar
+    call derivar
+    
+    cmp cd5,00      ; compara la variable con 0
+    je print_derG3  ; si es igual a 0 salta a print_derG3
+
+    ;Muestra el mensaje en pantalla
+    mov al, cd5
+    call showTwoNums
+    
+    ;Muestra el mensaje en pantalla
+    mov ah, 09h
+    lea dx, l4  ;muestra la literal x^4
+    int 21h
+
+    cmp cd4, 00
+    jne print_derG3aux
+    cmp cd3, 00
+    jne print_derG2aux
+    cmp cd2, 00
+    jne print_derG1aux
+    cmp cd1, 00
+    jne print_derG0aux
+    jmp salir_derivada
+    ;-------------------------------------------------------------
+
+
+    print_derG3aux:
+        call mostrar_suma
+        jmp print_derG3
+    print_derG2aux:
+        call mostrar_suma
+        jmp print_derG2
+    print_derG1aux:
+        call mostrar_suma
+        jmp print_derG1
+    print_derG0aux:
+        call mostrar_suma
+        jmp print_derG0
+
+    print_derG3:
+        cmp cd4,00      ; compara la variable con 0
+        je print_derG2  ; si es igual a 0 salta a print_derG2
+
+        ;Muestra el mensaje en pantalla
+        mov al, cd4
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l3  ;muestra la literal x^3
+        int 21h
+
+        cmp cd3, 00
+        jne print_derG2aux
+        cmp cd2, 00
+        jne print_derG1aux
+        cmp cd1, 00
+        jne print_derG0aux
+        jmp salir_derivada
+    ;--------------------------------------------------------------
+    print_derG2:
+        cmp cd3,00      ; compara la variable con 0
+        je print_derG1  ; si es igual a 0 salta a print_derG1
+
+        ;Muestra el mensaje en pantalla
+        mov al, cd3
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l2  ;muestra la literal x^2
+        int 21h
+
+        cmp cd2, 00
+        jne print_derG1aux
+        cmp cd1, 00
+        jne print_derG0aux
+        jmp salir_derivada
+    ;---------------------------------------------------------------
+    print_derG1:
+        cmp cd2,00      ; compara la variable con 0
+        je print_derG0  ; si es igual a 0 salta a salidoEqL5aux
+
+        ;Muestra el mensaje en pantalla
+        mov al, cd2
+        call showTwoNums
+        
+        ;Muestra el mensaje en pantalla
+        mov ah, 09h
+        lea dx, l2  ;muestra la literal x
+        int 21h
+
+        cmp cd1, 00
+        jne print_derG0aux
+        jmp salir_derivada
+    ;----------------------------------------------------------------
+    print_derG0:
+        cmp cd1,00      ; compara la variable con 0
+        je salir_derivada  ; si es igual a 0 salta a salidoEqL5
+
+        ;Muestra el mensaje en pantalla
+        mov al, cd1
+        call showTwoNums
+        
+    salir_derivada:
+        ret
+
+derivada endp
+
+
+;Realiza la derivada de la funcion
+derivar proc
+
+    cmp c1, 00
+    je derG2
+
+    mov al, c1
+    mov cd1, al
+
+    derG2:
+        cmp c2, 00
+        je derG3
+
+        mov al, c2
+        mov bl, 2
+        mul bl
+        mov cd2, al
+    
+    derG3:
+        cmp c3, 00
+        je derG4
+
+        mov al, c3
+        mov bl, 3
+        mul bl
+        mov cd3, al
+
+    derG4:
+        cmp c4, 00
+        je derG5
+
+        mov al, c4
+        mov bl, 4
+        mul bl
+        mov cd4, al
+
+    derG5:
+        cmp c5, 00
+        je salirDerivarG1
+
+        mov al, c5
+        mov bl, 5
+        mul bl
+        mov cd5, al
+
+    salirDerivarG1:
+        ret
+
+
+derivar endp
 
 
 ;Limpia la ventana
