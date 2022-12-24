@@ -1148,7 +1148,7 @@ integral endp
 ;    mov al, c1
 ;dividirCof endp
 
-
+; Integra la funcion
 integrar proc
     mov al, c0
     mov ci0, al
