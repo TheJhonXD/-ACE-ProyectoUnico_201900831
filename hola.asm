@@ -1,7 +1,7 @@
 .model small
 .stack
 .data
-   saludo   db "Hola Putos", "$"
+   saludo   db "Hola Mundo", "$"
  
 .code
  

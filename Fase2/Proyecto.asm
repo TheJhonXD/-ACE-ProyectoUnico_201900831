@@ -46,7 +46,7 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     cof_msg4 db 13, 10, 'Ingrese el coeficiente para el grado 4: $'
     cof_msg5 db 13, 10, 'Ingrese el coeficiente para el grado 5: $'
 
-    ;Mensaje de ingreso de parametros metodo de steffensen
+    ;Mensaje de ingreso de parametros metodo de newton
     met_msg db 13, 10, 'Aproximacion inicial: $'
     met_msg1 db 13, 10, 'Numero de iteraciones máximo: $'
     met_msg2 db 13, 10, 'Coeficiente de tolerancia: $'
@@ -95,8 +95,15 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     p_lsup db 00
     p_linf db 00
 
-    ;Variables Steffensen
-    s_x db 00
+    ;Variables newton
+    n_xf db 00
+    n_xi db 00
+
+    ;Variables resultado funcion
+    res_func    db 00
+    res_funcaux db 00
+    f_x         db 00
+    ;f_y         db 00
 
 
     ;signos
@@ -107,6 +114,11 @@ datos segment          ;segmento de datos, aquí van nuestras variables
 
     ;ERROR
     msg_error db 'Entrada no valida$'
+
+    ;Modo de video
+	vid db ?	; Se guarda el modo de video
+    px dw 0
+    py dw 0
 
 datos ends
 
@@ -191,7 +203,15 @@ main proc FAR
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc5  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
-                call pressAnyKey
+                ;Entra al modo video
+                ModoVideo vid
+                ;Imprime los ejes
+                PrintEjes
+                ;Espera una tecla para salir del modo video
+                mov ah,01h
+                int 21h
+                ;Regresa al modo texto
+                ModoTexto vid
             jmp mostrar_menu
 
             opcion6:
@@ -1222,12 +1242,6 @@ integral proc
 integral endp
 
 
-;dividirCof proc
-;    xor ax, ax
-;    mov al, c1
-;dividirCof endp
-
-
 integrar proc
     mov al, c0
     mov ci0, al
@@ -1271,6 +1285,55 @@ integrar proc
         ret
 
 integrar endp
+
+
+GetY proc
+
+    cof_cinco:
+        cmp c5, 00
+        je cof_cuatro
+
+        multiplicar c5, f_x, res_funcaux
+        sumar res_func, res_funcaux
+
+    cof_cuatro:
+        cmp c4, 00
+        je cof_tres
+
+        multiplicar c4, f_x, res_funcaux
+        sumar res_func, res_funcaux
+    
+    cof_tres:
+        cmp c3, 00
+        je cof_dos
+
+        multiplicar c3, f_x, res_funcaux
+        sumar res_func, res_funcaux
+
+    cof_dos:
+        cmp c2, 00
+        je cof_uno
+
+        multiplicar c2, f_x, res_funcaux
+        sumar res_func, res_funcaux
+    
+    cof_uno:
+        cmp c1, 00
+        je cof_cero
+
+        multiplicar c1, f_x, res_funcaux
+        sumar res_func, res_funcaux
+    
+    cof_cero:
+        cmp c0, 00
+        je cof_salir
+
+        multiplicar c0, f_x, res_funcaux
+        sumar res_func, res_funcaux
+    
+    cof_salir
+        ret
+GetY endp
 
 
 ;Limpia la ventana
