@@ -55,6 +55,19 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     met_msg3 db 13, 10, 'Grado de tolerancia: $'
     met_msg4 db 13, 10, 'Limite superior del metodo: $'
     met_msg5 db 13, 10, 'Limite inferior: $'
+    met_msgError db 13, 10, 'El limite inferior debe ser menor al limite superior$'
+
+    ;Mensaje de eleccion de grafica
+    g_msg  db 13, 10, '1. Graficar funcion original'
+    g_msg1 db 13, 10, '2. Graficar derivada'
+    g_msg2 db 13, 10, '3. Graficar integral'
+    g_msg3 db 13, 10, '4. Salir'
+    g_msg4 db 13, 10, '>>> Opc: $'
+
+    ;Mensaje de grafica elegida
+    gf_msg  db 13, 10, ' ** Funcion original ** $'
+    gf_msg1 db 13, 10, ' ** Derivada ** $'
+    gf_msg2 db 13, 10, ' ** Integral ** $'
 
     ;Coeficientes
     u  db 00
@@ -97,6 +110,14 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     p_lsup db 00
     p_linf db 00
 
+    ;Coeficientes para la grafica
+    cg5 db 00
+    cg4 db 00
+    cg3 db 00
+    cg2 db 00
+    cg1 db 00
+    cg0 db 00
+
     ;Variables newton
     n_xf db 00
     n_xi db 00
@@ -117,6 +138,7 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     pt_ejeXP db 00 ; Eje x positivo
     pt_ejeXN db 00 ; Eje x negativo
     flag_vacio db 00 ;Bandera para saber si no hay una funcion
+    salidoMenuG db 00 ; Bandera para salir del menu
 
     ;signos
     sig_suma  db ' + $'
@@ -225,6 +247,11 @@ main proc FAR
                 call CofVacios
                 cmp flag_vacio, 0
                 je showMsgVacio
+
+                call OpcGrafica
+
+                cmp salidoMenuG, 1
+                je salidoMOpc5
 
                 ; Muestro mensaje para eje X+
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
@@ -666,6 +693,7 @@ menu_ecuacion endp
 
 menu_steff_new proc
     ;Pregunta
+    mostrarMsgMet:
     Print met_msg
     ;Captura dos numeros de entrada
     call capTwoNums
@@ -714,6 +742,19 @@ menu_steff_new proc
     mov p_linf, al  ; muevo el resultado a p_linf
     ;------------------------------
 
+    mov al, p_linf
+    cmp p_lsup, al
+    jle mostrarMsgError
+    jg salidoMenSN
+
+    mostrarMsgError:
+        Print met_msgError
+        call pressAnyKey
+        call limpiar
+        call posCursor
+        jmp mostrarMsgMet
+
+    salidoMenSN:
     ret
 
 menu_steff_new endp
@@ -791,6 +832,13 @@ resetCof proc
     mov c3, 00
     mov c4, 00
     mov c5, 00
+
+    mov cg0, 00
+    mov cg1, 00
+    mov cg2, 00
+    mov cg3, 00
+    mov cg4, 00
+    mov cg5, 00
 
     mov cd1, 00
     mov cd2, 00
@@ -1376,6 +1424,111 @@ GraficarFuncion proc
     ret
 GraficarFuncion endp
 
+OpcGrafica proc
+
+    mov salidoMenuG, 0
+    ;Resetear coeficientes
+    mov cg0, 00
+    mov cg1, 00
+    mov cg2, 00
+    mov cg3, 00
+    mov cg4, 00
+    mov cg5, 00
+
+    opcGf0:
+        call limpiar
+        call posCursor
+
+        Print g_msg
+        ;------------ Pido la opcion ------------
+        mov ah,01h
+        int 21h
+        ;sub al,48d      ; ajusto para que aparezca el numero
+        ;---------------------------------------- 
+        
+        ;Comparo las opciones para elejir la siguiente operacion a realizar
+        cmp al, 31h
+        je opcGf1
+        cmp al, 32h
+        je opcGf2
+        cmp al, 33h
+        je opcGf3
+        cmp al, 34h
+        je salidoOpcgAux
+    jmp opcGf0
+
+    opcGf1:
+        mov al, c5
+        mov cg5, al
+
+        mov al, c4
+        mov cg4, al
+        
+        mov al, c3
+        mov cg3, al
+
+        mov al, c2
+        mov cg2, al
+
+        mov al, c1
+        mov cg1, al
+
+        mov al, c0
+        mov cg0, al
+
+        Print gf_msg
+    jmp salidoOpcG
+
+    opcGf2:
+        call derivar
+
+        mov al, cd5
+        mov cg4, al
+        
+        mov al, cd4
+        mov cg3, al
+
+        mov al, cd3
+        mov cg2, al
+
+        mov al, cd2
+        mov cg1, al
+
+        mov al, cd1
+        mov cg0, al
+
+        Print gf_msg1
+    jmp salidoOpcG
+
+    opcGf3:
+        call integrar
+
+        mov al, ci4
+        mov cg5, al
+
+        mov al, ci3
+        mov cg4, al
+        
+        mov al, ci2
+        mov cg3, al
+
+        mov al, ci1
+        mov cg2, al
+
+        mov al, ci0
+        mov cg1, al
+
+        Print gf_msg2
+    jmp salidoOpcG
+
+    salidoOpcgAux:
+        mov salidoMenuG, 1
+
+    salidoOpcG:
+        ret
+OpcGrafica endp
+
+
 GraficarFuncion2 proc
     cmp pt_ejeXP, 00
     je gf_loop3
@@ -1500,7 +1653,7 @@ ResetarPotFunc endp
 GetY proc
     mov res_func, 0
     cof_cinco:
-        cmp c5, 00
+        cmp cg5, 00
         je cof_cuatro
 
         ;Reseteo las variables
@@ -1510,11 +1663,11 @@ GetY proc
 
         ;call ResetarPotFunc
         Potencia f_x, 5, res_pot, varCont
-        multiplicarFunc c5, res_pot, res_funcaux
+        multiplicarFunc cg5, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
 
     cof_cuatro:
-        cmp c4, 00
+        cmp cg4, 00
         je cof_tres
 
         ;Reseteo las variables
@@ -1524,11 +1677,11 @@ GetY proc
 
         ;call ResetarPotFunc
         Potencia f_x, 4, res_pot, varCont
-        multiplicarFunc c4, res_pot, res_funcaux
+        multiplicarFunc cg4, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
     
     cof_tres:
-        cmp c3, 00
+        cmp cg3, 00
         je cof_dos
 
         ;Reseteo las variables
@@ -1538,11 +1691,11 @@ GetY proc
 
         ;call ResetarPotFunc
         Potencia f_x, 3, res_pot, varCont
-        multiplicarFunc c3, res_pot, res_funcaux
+        multiplicarFunc cg3, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
 
     cof_dos:
-        cmp c2, 00
+        cmp cg2, 00
         je cof_uno
 
         ;Reseteo las variables
@@ -1551,11 +1704,11 @@ GetY proc
         mov f_xaux, 0
         ;call ResetarPotFunc
         Potencia f_x, 2, res_pot, varCont
-        multiplicarFunc c2, res_pot, res_funcaux
+        multiplicarFunc cg2, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
     
     cof_uno:
-        cmp c1, 00
+        cmp cg1, 00
         je cof_cero
 
         ;Reseteo las variables
@@ -1567,18 +1720,18 @@ GetY proc
         ;Potencia f_x, 1, res_pot, varCont
         mov al, f_x
         mov res_pot, al
-        multiplicarFunc c1, res_pot, res_funcaux
+        multiplicarFunc cg1, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
     
     cof_cero:
-        cmp c0, 00
+        cmp cg0, 00
         je cof_salir
 
         ;call ResetarPotFunc
         ;Potencia f_x, 0, res_pot
         ;multiplicarFunc c0, res_pot, res_funcaux
         ;sumarFunc res_func, c0
-        sumarFunc2 c0, res_func
+        sumarFunc2 cg0, res_func
     
     cof_salir:
         ;mov cx, res_func
@@ -1597,7 +1750,7 @@ GetY endp
 GetYN proc
     mov res_func, 0
     cof_cincoN:
-        cmp c5, 00
+        cmp cg5, 00
         je cof_cuatroN
 
         ;Reseteo las variables
@@ -1607,12 +1760,12 @@ GetYN proc
 
         ;call ResetarPotFunc
         Potencia f_x, 5, res_pot, varCont
-        multiplicarFunc c5, res_pot, res_funcaux
+        multiplicarFunc cg5, res_pot, res_funcaux
         ;sumarFunc res_func, res_funcaux
         restarFunc2 res_func, res_funcaux
 
     cof_cuatroN:
-        cmp c4, 00
+        cmp cg4, 00
         je cof_tresN
 
         ;Reseteo las variables
@@ -1622,11 +1775,11 @@ GetYN proc
 
         ;call ResetarPotFunc
         Potencia f_x, 4, res_pot, varCont
-        multiplicarFunc c4, res_pot, res_funcaux
+        multiplicarFunc cg4, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
     
     cof_tresN:
-        cmp c3, 00
+        cmp cg3, 00
         je cof_dosN
 
         ;Reseteo las variables
@@ -1636,12 +1789,12 @@ GetYN proc
 
         ;call ResetarPotFunc
         Potencia f_x, 3, res_pot, varCont
-        multiplicarFunc c3, res_pot, res_funcaux
+        multiplicarFunc cg3, res_pot, res_funcaux
         ;sumarFunc res_func, res_funcaux
         restarFunc2 res_func, res_funcaux
 
     cof_dosN:
-        cmp c2, 00
+        cmp cg2, 00
         je cof_unoN
 
         ;Reseteo las variables
@@ -1650,11 +1803,11 @@ GetYN proc
         mov f_xaux, 0
         ;call ResetarPotFunc
         Potencia f_x, 2, res_pot, varCont
-        multiplicarFunc c2, res_pot, res_funcaux
+        multiplicarFunc cg2, res_pot, res_funcaux
         sumarFunc res_func, res_funcaux
     
     cof_unoN:
-        cmp c1, 00
+        cmp cg1, 00
         je cof_ceroN
 
         ;Reseteo las variables
@@ -1666,7 +1819,7 @@ GetYN proc
         ;Potencia f_x, 1, res_pot, varCont
         mov al, f_x
         mov res_pot, al
-        multiplicarFunc c1, res_pot, res_funcaux
+        multiplicarFunc cg1, res_pot, res_funcaux
         ;sumarFunc res_func, res_funcaux
         restarFunc2 res_func, res_funcaux
         ;mov ax, res_func
@@ -1675,14 +1828,14 @@ GetYN proc
         ;mov res_func, ax
     
     cof_ceroN:
-        cmp c0, 00
+        cmp cg0, 00
         je cof_salirN
 
         ;call ResetarPotFunc
         ;Potencia f_x, 0, res_pot
         ;multiplicarFunc c0, res_pot, res_funcaux
         ;sumarFunc res_func, c0
-        sumarFunc2 c0, res_func
+        sumarFunc2 cg0, res_func
     
     cof_salirN:
         ;mov cx, res_func
