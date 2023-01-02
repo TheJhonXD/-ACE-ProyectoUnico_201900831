@@ -22,9 +22,11 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     opc2 db 13, 10, 'Funcion almacenada: $'
     opc3 db 13, 10, 'Derivada de la funcion: $'
     opc4 db 13, 10, 'Integral de la funcion: $'
-    opc5 db 13, 10, 'Opcion 5 $'
-    opc6 db '** Metodo de Steffensen ** $', 13, 10
-    opc7 db 13, 10, 'Opcion 7 $'
+    opc5 db 13, 10, 'X+: $'
+    opc51 db 13, 10, 'X-: $'
+    opc52 db 13, 10, 'No se ha ingresado una funcion $'
+    opc7 db '** Metodo de Steffensen ** $', 13, 10
+    opc6 db '** Metodo de Newton ** $', 13, 10
     opc8 db 13, 10, 'Opcion 8 $'
 
     ; Submenu de Ingresar ecuacion
@@ -48,11 +50,11 @@ datos segment          ;segmento de datos, aquí van nuestras variables
 
     ;Mensaje de ingreso de parametros metodo de newton
     met_msg db 13, 10, 'Aproximacion inicial: $'
-    met_msg1 db 13, 10, 'Numero de iteraciones máximo: $'
+    met_msg1 db 13, 10, 'Numero de iteraciones maximo: $'
     met_msg2 db 13, 10, 'Coeficiente de tolerancia: $'
     met_msg3 db 13, 10, 'Grado de tolerancia: $'
-    met_msg4 db 13, 10, 'Límite superior del método: $'
-    met_msg5 db 13, 10, 'Límite inferior: $'
+    met_msg4 db 13, 10, 'Limite superior del metodo: $'
+    met_msg5 db 13, 10, 'Limite inferior: $'
 
     ;Coeficientes
     u  db 00
@@ -100,17 +102,31 @@ datos segment          ;segmento de datos, aquí van nuestras variables
     n_xi db 00
 
     ;Variables resultado funcion
-    res_func    db 00
-    res_funcaux db 00
-    f_x         db 00
+    res_func    dw 00
+    res_funcaux dw 00
+    res_pot     db 00
+    f_x         db 0
+    f_xaux      db 0
+    aux1 dw 100
+    aux2 dw 1
+    aux3 dw 2
     ;f_y         db 00
 
+
+    ; Variables para graficar
+    pt_ejeXP db 00 ; Eje x positivo
+    pt_ejeXN db 00 ; Eje x negativo
+    flag_vacio db 00 ;Bandera para saber si no hay una funcion
 
     ;signos
     sig_suma  db ' + $'
     sig_resta db ' - $'
     sig_punto db ' . $'
     let_C     db 'C$'
+
+
+    ; Variable contador para la potencia
+    varCont db 1
 
     ;ERROR
     msg_error db 'Entrada no valida$'
@@ -119,6 +135,12 @@ datos segment          ;segmento de datos, aquí van nuestras variables
 	vid db ?	; Se guarda el modo de video
     px dw 0
     py dw 0
+    pyaux dw 0
+    numIteracion dw 1
+
+
+    posPrueba1 db 162
+    posPrueba2 db 96
 
 datos ends
 
@@ -200,29 +222,84 @@ main proc FAR
             jmp mostrar_menu
 
             opcion5:
+                call CofVacios
+                cmp flag_vacio, 0
+                je showMsgVacio
+
+                ; Muestro mensaje para eje X+
                 mov    ah,09h   ;funcion para imprimir una cadena en pantalla
                 lea    dx, opc5  ; le digo que me imprima letrero 
                 int    21h      ; interrupcion 21h 
+
+               ;Captura dos numeros de entrada
+                call capTwoNums
+                
+                ;----- Unir los numeros --------
+                call unirNums
+                mov pt_ejeXP, al  ; muevo el resultado a pt_ejeXP
+                ;------------------------------
+                mov al, 0
+                ;Muestro mensaje para eje X-
+                mov    ah,09h   ;funcion para imprimir una cadena en pantalla
+                lea    dx, opc51  ; le digo que me imprima letrero 
+                int    21h      ; interrupcion 21h 
+
+                ;Captura dos numeros de entrada
+                call capTwoNums
+                
+                ;----- Unir los numeros --------
+                call unirNums
+                mov pt_ejeXN, al  ; muevo el resultado a pt_ejeXN
+                ;------------------------------
+                call pressAnyKey
                 ;Entra al modo video
                 ModoVideo vid
                 ;Imprime los ejes
                 PrintEjes
+                
+                ;Reseteo las variables
+                mov varCont, 1
+                mov res_funcaux, 0
+                mov f_xaux, 0
+                mov res_func, 0
+                mov f_x, 0
+                ;AQUI
+                call GraficarFuncion2
+
                 ;Espera una tecla para salir del modo video
                 mov ah,01h
                 int 21h
                 ;Regresa al modo texto
                 ModoTexto vid
+                jmp salidoMOpc5
+
+                showMsgVacio:
+                    ; Muestro mensaje para eje X+
+                    mov    ah,09h   ;funcion para imprimir una cadena en pantalla
+                    lea    dx, opc52  ; le digo que me imprima letrero 
+                    int    21h      ; interrupcion 21h 
+                    call pressAnyKey
+                salidoMOpc5:
+                
             jmp mostrar_menu
 
             opcion6:
+                call limpiar
+                call posCursor
+                ;Imprime titulo de menu
+                Print opc6
+
                 call menu_steff_new
                 call pressAnyKey
             jmp mostrar_menu
 
             opcion7:
-                mov    ah,09h   ;funcion para imprimir una cadena en pantalla
-                lea    dx, opc7  ; le digo que me imprima letrero 
-                int    21h      ; interrupcion 21h 
+                call limpiar
+                call posCursor
+                ;Imprime titulo de menu
+                Print opc7
+
+                call menu_steff_new
                 call pressAnyKey
             jmp mostrar_menu
 
@@ -588,11 +665,6 @@ menu_ecuacion proc
 menu_ecuacion endp
 
 menu_steff_new proc
-
-    call limpiar
-    call posCursor
-    ;Imprime titulo de menu
-    Print opc6
     ;Pregunta
     Print met_msg
     ;Captura dos numeros de entrada
@@ -1286,54 +1358,344 @@ integrar proc
 
 integrar endp
 
+GraficarFuncion proc
+    gf_loop:
+        mov ax, aux3
+        mov bx, aux2
+        mul bx 
+        mov aux2, ax
+        mov dx, aux2
+        mov py, dx
+        ;PrintDot px, py
+        inc aux1
+        mov cx, aux1
+        mov px, cx
+
+        cmp aux1, 200
+        jne gf_loop
+    ret
+GraficarFuncion endp
+
+GraficarFuncion2 proc
+    cmp pt_ejeXP, 00
+    je gf_loop3
+    gf_loop2:
+        inc f_x
+
+        ;***** Positivo *****
+        call GetY
+        xor cx, cx
+        xor dx, dx
+        ;Ajuste en Y
+        ;sumarFunc res_func, 100
+        restarFunc 100, res_func
+        ;Ajuste en X, si está bien
+        sumar f_xaux, 160
+        sumar f_xaux, f_x
+        mov dx, res_func
+        mov cl, f_xaux
+        PrintDot2
+        ;********************
+        mov cl, 0
+        mov cl, pt_ejeXP
+        ;cmp f_x, 4
+        cmp f_x, cl
+        jne gf_loop2
+
+    mov f_xaux, 0
+    mov res_funcaux, 0
+    mov varCont, 1
+    mov f_x, 0
+
+    cmp pt_ejeXN, 00
+    je salirGF2
+
+    gf_loop3:
+        inc f_x
+        ;***** Negativo *****
+        call GetYN
+        xor cx, cx
+        xor dx, dx
+        ;Ajuste en Y
+        ;sumarFunc res_func, 100
+        ;comprobar si es negativo
+        cmp res_func, 00
+        jle sumarCor
+        jg restarCor
+        restarCor:
+            restarFunc 100, res_func
+            jmp ajusteCor
+        sumarCor:
+            ;neg res_func
+            restarFunc 100, res_func
+            ;sumarFunc res_func, 100
+            jmp ajusteCor
+        ;Ajuste en X, si está bien
+        ;sumar f_xaux, 160
+        ajusteCor:
+            sumar f_xaux, f_x
+            restar 160, f_xaux
+            mov dx, res_func
+            mov cl, f_xaux
+            PrintDot2
+        ;********************
+        mov cl, 0
+        mov cl, pt_ejeXN
+        ;cmp f_x, 4
+        cmp f_x, cl
+        jne gf_loop3
+    salirGF2:
+        ret
+GraficarFuncion2 endp
+
+CofVacios proc
+    mov flag_vacio, 0
+    cofVacio5:
+        cmp c5, 00
+        je cofVacio4
+        jne salirCofFull
+
+    cofVacio4:
+        cmp c4, 00
+        je cofVacio3
+        jne salirCofFull
+
+    cofVacio3:
+        cmp c3, 00
+        je cofVacio2
+        jne salirCofFull
+
+    cofVacio2:
+        cmp c2, 00
+        je cofVacio1
+        jne salirCofFull
+
+    cofVacio1:
+        cmp c1, 00
+        je cofVacio0
+        jne salirCofFull
+
+    cofVacio0:
+        cmp c0, 00
+        je salirCofVacios
+        jne salirCofFull
+
+    salirCofVacios:
+        mov flag_vacio, 0
+        jmp salidoCofV
+    salirCofFull:
+        mov flag_vacio, 1
+    
+    salidoCofV:
+        ret
+CofVacios endp
+
+ResetarPotFunc proc
+
+    ;xor res_pot, res_pot
+    ;mov res_funcaux, 0
+
+ResetarPotFunc endp
 
 GetY proc
-
+    mov res_func, 0
     cof_cinco:
         cmp c5, 00
         je cof_cuatro
 
-        multiplicar c5, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 5, res_pot, varCont
+        multiplicarFunc c5, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
 
     cof_cuatro:
         cmp c4, 00
         je cof_tres
 
-        multiplicar c4, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 4, res_pot, varCont
+        multiplicarFunc c4, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
     
     cof_tres:
         cmp c3, 00
         je cof_dos
 
-        multiplicar c3, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 3, res_pot, varCont
+        multiplicarFunc c3, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
 
     cof_dos:
         cmp c2, 00
         je cof_uno
 
-        multiplicar c2, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+        ;call ResetarPotFunc
+        Potencia f_x, 2, res_pot, varCont
+        multiplicarFunc c2, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
     
     cof_uno:
         cmp c1, 00
         je cof_cero
 
-        multiplicar c1, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        ;Potencia f_x, 1, res_pot, varCont
+        mov al, f_x
+        mov res_pot, al
+        multiplicarFunc c1, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
     
     cof_cero:
         cmp c0, 00
         je cof_salir
 
-        multiplicar c0, f_x, res_funcaux
-        sumar res_func, res_funcaux
+        ;call ResetarPotFunc
+        ;Potencia f_x, 0, res_pot
+        ;multiplicarFunc c0, res_pot, res_funcaux
+        ;sumarFunc res_func, c0
+        sumarFunc2 c0, res_func
     
-    cof_salir
+    cof_salir:
+        ;mov cx, res_func
+        ;mov py, cx
+        ;xor cx, cx
+        ;xor dx, dx
+        ;mov dx, res_func
+        ;mov cl, f_x
+        ;PrintDot2
+        ;PrintDot 162, 96
         ret
+
 GetY endp
+
+; Obteniene la coordenada y para el lado negativo de x
+GetYN proc
+    mov res_func, 0
+    cof_cincoN:
+        cmp c5, 00
+        je cof_cuatroN
+
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 5, res_pot, varCont
+        multiplicarFunc c5, res_pot, res_funcaux
+        ;sumarFunc res_func, res_funcaux
+        restarFunc2 res_func, res_funcaux
+
+    cof_cuatroN:
+        cmp c4, 00
+        je cof_tresN
+
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 4, res_pot, varCont
+        multiplicarFunc c4, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
+    
+    cof_tresN:
+        cmp c3, 00
+        je cof_dosN
+
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        Potencia f_x, 3, res_pot, varCont
+        multiplicarFunc c3, res_pot, res_funcaux
+        ;sumarFunc res_func, res_funcaux
+        restarFunc2 res_func, res_funcaux
+
+    cof_dosN:
+        cmp c2, 00
+        je cof_unoN
+
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+        ;call ResetarPotFunc
+        Potencia f_x, 2, res_pot, varCont
+        multiplicarFunc c2, res_pot, res_funcaux
+        sumarFunc res_func, res_funcaux
+    
+    cof_unoN:
+        cmp c1, 00
+        je cof_ceroN
+
+        ;Reseteo las variables
+        mov varCont, 1
+        mov res_funcaux, 0
+        mov f_xaux, 0
+
+        ;call ResetarPotFunc
+        ;Potencia f_x, 1, res_pot, varCont
+        mov al, f_x
+        mov res_pot, al
+        multiplicarFunc c1, res_pot, res_funcaux
+        ;sumarFunc res_func, res_funcaux
+        restarFunc2 res_func, res_funcaux
+        ;mov ax, res_func
+        ;not ax
+        ;inc ax
+        ;mov res_func, ax
+    
+    cof_ceroN:
+        cmp c0, 00
+        je cof_salirN
+
+        ;call ResetarPotFunc
+        ;Potencia f_x, 0, res_pot
+        ;multiplicarFunc c0, res_pot, res_funcaux
+        ;sumarFunc res_func, c0
+        sumarFunc2 c0, res_func
+    
+    cof_salirN:
+        ;mov cx, res_func
+        ;mov py, cx
+        ;xor cx, cx
+        ;xor dx, dx
+        ;mov dx, res_func
+        ;mov cl, f_x
+        ;PrintDot2
+        ;PrintDot 162, 96
+        ret
+
+GetYN endp
 
 
 ;Limpia la ventana
