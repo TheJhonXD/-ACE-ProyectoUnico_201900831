@@ -125,7 +125,7 @@ PrintEjes macro
     xor cx, cx
     ejeX:
         mov ah, 0Ch
-        mov al, 20; Color rojo
+        mov al, 06; Color rojo
         mov bh, 0h
         mov dx, 100
         int 10h
@@ -136,7 +136,7 @@ PrintEjes macro
     xor dx, dx
     ejeY:
         mov ah, 0Ch
-        mov al, 20; Color rojo
+        mov al, 06; Color rojo
         mov bh, 0h
         mov cx, 160
         int 10h
